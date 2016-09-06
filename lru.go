@@ -77,6 +77,26 @@ func (c *Cache) Add(key Key, value interface{}) {
 	}
 }
 
+// PushBack adds a value to the cache as least recent used.
+func (c *Cache) PushBack(key Key, value interface{}) {
+	c.ml.Lock()
+	defer c.ml.Unlock()
+
+	if c.cache == nil {
+		c.cache = make(map[interface{}]*list.Element)
+		c.ll = list.New()
+	}
+	if ee, ok := c.cache[key]; ok {
+		c.ll.MoveToBack(ee)
+		ee.Value.(*entry).value = value
+		return
+	}
+	if c.MaxEntries == 0 || c.ll.Len() < c.MaxEntries {
+		ele := c.ll.PushBack(&entry{key, value})
+		c.cache[key] = ele
+	}
+}
+
 // Get looks up a key's value from the cache.
 func (c *Cache) Get(key Key) (value interface{}, ok bool) {
 	c.ml.Lock()
@@ -139,7 +159,7 @@ func (c *Cache) Len() int {
 	return c.ll.Len()
 }
 
-// ForEach call function for every item in the cache in recent usage order
+// ForEach call function for every item in the cache in most to least recent usage order
 func (c *Cache) ForEach(f func(key Key, value interface{}) bool) {
 	c.ml.Lock()
 	defer c.ml.Unlock()
